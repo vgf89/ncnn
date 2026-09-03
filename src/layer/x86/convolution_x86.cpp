@@ -1006,6 +1006,52 @@ int Convolution_x86::forward_int8_x86(const Mat& bottom_blob, Mat& top_blob, con
             return -100;
     }
 
+    // flattened 1D blob (e.g. SE squeeze branches): reshape to 3D and recurse,
+    // mirroring the float 1D-compatibility path below. Without this, pack groups
+    // are misread as spatial width (wrong output shape).
+    if (bottom_blob_int8.dims == 1 && kernel_w == 1 && kernel_h == 1)
+    {
+        Mat bottom_blob_3d;
+        if (bottom_blob_int8.elemsize % 16 == 0)
+        {
+            bottom_blob_3d = bottom_blob_int8;
+            bottom_blob_3d.dims = 3;
+            bottom_blob_3d.w = 1;
+            bottom_blob_3d.h = 1;
+            bottom_blob_3d.c = bottom_blob_int8.w;
+            bottom_blob_3d.cstep = 1;
+        }
+        else
+        {
+            bottom_blob_3d = bottom_blob_int8.reshape(1, 1, bottom_blob_int8.w, opt.workspace_allocator);
+            if (bottom_blob_3d.empty())
+                return -100;
+        }
+
+        Mat top_blob_3d;
+        int ret = forward_int8_x86(bottom_blob_3d, top_blob_3d, opt);
+        if (ret != 0)
+            return ret;
+
+        if (top_blob_3d.elemsize % 16 == 0)
+        {
+            top_blob = top_blob_3d;
+            top_blob.dims = 1;
+            top_blob.w = top_blob_3d.c;
+            top_blob.h = 1;
+            top_blob.c = 1;
+            top_blob.cstep = top_blob_3d.c;
+        }
+        else
+        {
+            top_blob = top_blob_3d.reshape(top_blob_3d.c, opt.blob_allocator);
+            if (top_blob.empty())
+                return -100;
+        }
+
+        return 0;
+    }
+
     //     NCNN_LOGE("Convolution_x86 input %d x %d  ksize=%d %d  stride=%d %d", w, h, kernel_w, kernel_h, stride_w, stride_h);
 
     Mat bottom_blob_bordered;

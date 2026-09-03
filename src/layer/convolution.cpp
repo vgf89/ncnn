@@ -403,6 +403,52 @@ int Convolution::forward_int8(const Mat& bottom_blob, Mat& top_blob, const Optio
             return -100;
     }
 
+    // flattened 1D blob (e.g. SE squeeze branches): reshape to 3D and recurse,
+    // mirroring the float 1D-compatibility path in forward(). Without this, pack
+    // groups are misread as spatial width (wrong output shape).
+    if (bottom_blob_unbordered.dims == 1 && kernel_w == 1 && kernel_h == 1)
+    {
+        Mat bottom_blob_3d;
+        if (bottom_blob_unbordered.elemsize % 16 == 0)
+        {
+            bottom_blob_3d = bottom_blob_unbordered;
+            bottom_blob_3d.dims = 3;
+            bottom_blob_3d.w = 1;
+            bottom_blob_3d.h = 1;
+            bottom_blob_3d.c = bottom_blob_unbordered.w;
+            bottom_blob_3d.cstep = 1;
+        }
+        else
+        {
+            bottom_blob_3d = bottom_blob_unbordered.reshape(1, 1, bottom_blob_unbordered.w, opt.workspace_allocator);
+            if (bottom_blob_3d.empty())
+                return -100;
+        }
+
+        Mat top_blob_3d;
+        int ret = forward_int8(bottom_blob_3d, top_blob_3d, opt);
+        if (ret != 0)
+            return ret;
+
+        if (top_blob_3d.elemsize % 16 == 0)
+        {
+            top_blob = top_blob_3d;
+            top_blob.dims = 1;
+            top_blob.w = top_blob_3d.c;
+            top_blob.h = 1;
+            top_blob.c = 1;
+            top_blob.cstep = top_blob_3d.c;
+        }
+        else
+        {
+            top_blob = top_blob_3d.reshape(top_blob_3d.c, opt.blob_allocator);
+            if (top_blob.empty())
+                return -100;
+        }
+
+        return 0;
+    }
+
     Mat bottom_blob_bordered;
     make_padding(bottom_blob_unbordered, bottom_blob_bordered, opt);
     if (bottom_blob_bordered.empty())
