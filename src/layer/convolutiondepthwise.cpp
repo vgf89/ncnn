@@ -79,7 +79,9 @@ int ConvolutionDepthWise::load_model(const ModelBin& mb)
     }
 
 #if NCNN_INT8
-    if (int8_scale_term == 1 || int8_scale_term == 101)
+    // NOTE ncnn2int8 may fuse requantize multiple times for split-fanout
+    // consumers, producing 201/202 in addition to 101/102. Handle by residue.
+    if (int8_scale_term % 100 == 1)
     {
         weight_data_int8_scales = mb.load(group, 1);
         bottom_blob_int8_scales = mb.load(1, 1);
@@ -88,7 +90,7 @@ int ConvolutionDepthWise::load_model(const ModelBin& mb)
         bottom_blob_int8_scales = Mat(group);
         bottom_blob_int8_scales.fill(bottom_blob_int8_scale);
     }
-    else if (int8_scale_term == 2 || int8_scale_term == 102)
+    else if (int8_scale_term % 100 == 2)
     {
         weight_data_int8_scales = mb.load(1, 1);
         bottom_blob_int8_scales = mb.load(1, 1);
