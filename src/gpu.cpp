@@ -6068,6 +6068,10 @@ int compile_spirv_module(const char* comp_data, int comp_data_size, const Option
     {
         custom_exts += "#extension GL_EXT_shader_explicit_arithmetic_types_int8: require\n";
     }
+    if (info.support_VK_KHR_shader_integer_dot_product())
+    {
+        custom_exts += "#extension GL_EXT_integer_dot_product : require\n";
+    }
 #if ENABLE_VALIDATION_LAYER
     {
         custom_exts += "#extension GL_EXT_debug_printf : require\n";
