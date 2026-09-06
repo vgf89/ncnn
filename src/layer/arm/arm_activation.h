@@ -52,6 +52,10 @@ static inline float32x4_t activation_ps(float32x4_t _v, int activation_type, con
         _ans = vminq_f32(_ans, _one);
         _v = vmulq_f32(_ans, _v);
     }
+    else if (activation_type == 7)
+    {
+        _v = fast_gelu_ps(_v);
+    }
 
     return _v;
 }
@@ -87,6 +91,12 @@ static inline __fp16 activation_ss_f16(__fp16 v, int activation_type, const ncnn
     else if (activation_type == 5)
     {
         v = v * (__fp16)tanhf(logf(expf((float)v) + 1.f));
+    }
+    else if (activation_type == 7)
+    {
+        // fast GELU (tanh approximation)
+        float x = (float)v;
+        v = (__fp16)(0.5f * x * (1.f + tanhf(0.79788452f * (x + 0.044715f * x * x * x))));
     }
     else if (activation_type == 6)
     {
@@ -135,6 +145,13 @@ static inline float16x4_t activation_ps_f16(float16x4_t _v, int activation_type,
     {
         _v = vmul_f16(_v, tanh_ps_f16(log_ps_f16(vadd_f16(exp_ps_f16(_v), vdup_n_f16(1.f)))));
     }
+    else if (activation_type == 7)
+    {
+        // fast GELU (tanh approximation)
+        float16x4_t _x3 = vmul_f16(vmul_f16(_v, _v), _v);
+        float16x4_t _inner = vadd_f16(vmul_f16(vdup_n_f16((__fp16)0.79788452f), _v), vmul_f16(vdup_n_f16((__fp16)(0.044715f * 0.79788452f)), _x3));
+        _v = vmul_f16(vmul_f16(vdup_n_f16((__fp16)0.5f), _v), vadd_f16(vdup_n_f16((__fp16)1.f), tanh_ps_f16(_inner)));
+    }
     else if (activation_type == 6)
     {
         const __fp16 alpha = (__fp16)activation_params[0];
@@ -180,6 +197,13 @@ static inline float16x8_t activation_ps_f16(float16x8_t _v, int activation_type,
     else if (activation_type == 5)
     {
         _v = vmulq_f16(_v, tanh_ps_f16(log_ps_f16(vaddq_f16(exp_ps_f16(_v), vdupq_n_f16(1.f)))));
+    }
+    else if (activation_type == 7)
+    {
+        // fast GELU (tanh approximation)
+        float16x8_t _x3 = vmulq_f16(vmulq_f16(_v, _v), _v);
+        float16x8_t _inner = vaddq_f16(vmulq_f16(vdupq_n_f16((__fp16)0.79788452f), _v), vmulq_f16(vdupq_n_f16((__fp16)(0.044715f * 0.79788452f)), _x3));
+        _v = vmulq_f16(vmulq_f16(vdupq_n_f16((__fp16)0.5f), _v), vaddq_f16(vdupq_n_f16((__fp16)1.f), tanh_ps_f16(_inner)));
     }
     else if (activation_type == 6)
     {

@@ -30,6 +30,17 @@ static NCNN_FORCEINLINE v4f32 mish_msa(v4f32 inputs)
     return __msa_fmul_w(inputs, tanh_msa(log_ps(__msa_fadd_w(exp_ps(inputs), (v4f32)__msa_fill_w_f32(1.f)))));
 }
 
+static NCNN_FORCEINLINE v4f32 fast_gelu_msa(v4f32 inputs)
+{
+    // 0.5x * (1 + tanh(0.79788452 * (x + 0.044715 * x^3)))
+    const v4f32 half = (v4f32)__msa_fill_w_f32(0.5f);
+    const v4f32 one = (v4f32)__msa_fill_w_f32(1.0f);
+    v4f32 x3 = __msa_fmul_w(__msa_fmul_w(inputs, inputs), inputs);
+    v4f32 inner = __msa_fadd_w(__msa_fmul_w((v4f32)__msa_fill_w_f32(0.79788452f), inputs),
+                               __msa_fmul_w((v4f32)__msa_fill_w_f32(0.044715f * 0.79788452f), x3));
+    return __msa_fmul_w(__msa_fmul_w(half, inputs), __msa_fadd_w(one, tanh_msa(inner)));
+}
+
 static NCNN_FORCEINLINE v4f32 swish_msa(v4f32 inputs)
 {
     return __msa_fmul_w(inputs, sigmoid_msa(inputs));
@@ -103,6 +114,11 @@ static NCNN_FORCEINLINE v4f32 activation_msa(v4f32 _v, int activation_type, cons
         v4f32 _a = (v4f32)__msa_fill_w_f32(activation_params[0]);
         v4f32 _b = (v4f32)__msa_fill_w_f32(activation_params[1]);
         return hardswish_msa(_v, _a, _b);
+    }
+    case 7:
+    {
+        // fast GELU (tanh approximation)
+        return fast_gelu_msa(_v);
     }
     }
 

@@ -52,6 +52,12 @@
             vfloat##SEW##m##LMUL##_t _p0 = __riscv_vfadd_vf_f##SEW##m##LMUL##_m(_apply, __riscv_vfmul_vf_f##SEW##m##LMUL##_m(_apply, _v, (STYPE)alpha, vl), (STYPE)beta, vl); \
             _v = __riscv_vfmul_vv_f##SEW##m##LMUL##_mu(_apply, _v, _v, _p0, vl);                                                                                              \
         }                                                                                                                                                                     \
+        else if (activation_type == 7)                                                                                                                                        \
+        {                                                                                                                                                                     \
+            vfloat##SEW##m##LMUL##_t _x3 = __riscv_vfmul_vv_f##SEW##m##LMUL(__riscv_vfmul_vv_f##SEW##m##LMUL(_v, _v, vl), _v, vl);                                              \
+            vfloat##SEW##m##LMUL##_t _in = __riscv_vfadd_vv_f##SEW##m##LMUL(__riscv_vfmul_vf_f##SEW##m##LMUL(_v, (STYPE)0.79788452f, vl), __riscv_vfmul_vf_f##SEW##m##LMUL(_x3, (STYPE)(0.044715f * 0.79788452f), vl), vl); \
+            _v = __riscv_vfmul_vv_f##SEW##m##LMUL(__riscv_vfmul_vf_f##SEW##m##LMUL(_v, (STYPE)0.5f, vl), __riscv_vfadd_vf_f##SEW##m##LMUL(tanh_ps(_in, vl), (STYPE)1.f, vl), vl); \
+        }                                                                                                                                                                     \
                                                                                                                                                                               \
         return _v;                                                                                                                                                            \
     }

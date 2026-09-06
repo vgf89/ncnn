@@ -30,6 +30,17 @@ static NCNN_FORCEINLINE __m128 mish_lsx(__m128 inputs)
     return __lsx_vfmul_s(inputs, tanh_lsx(log_ps(__lsx_vfadd_s(exp_ps(inputs), (__m128)__lsx_vreplfr2vr_s(1.f)))));
 }
 
+static NCNN_FORCEINLINE __m128 fast_gelu_lsx(__m128 inputs)
+{
+    // 0.5x * (1 + tanh(0.79788452 * (x + 0.044715 * x^3)))
+    const __m128 half = (__m128)__lsx_vreplfr2vr_s(0.5f);
+    const __m128 one = (__m128)__lsx_vreplfr2vr_s(1.0f);
+    __m128 x3 = __lsx_vfmul_s(__lsx_vfmul_s(inputs, inputs), inputs);
+    __m128 inner = __lsx_vfadd_s(__lsx_vfmul_s((__m128)__lsx_vreplfr2vr_s(0.79788452f), inputs),
+                                 __lsx_vfmul_s((__m128)__lsx_vreplfr2vr_s(0.044715f * 0.79788452f), x3));
+    return __lsx_vfmul_s(__lsx_vfmul_s(half, inputs), __lsx_vfadd_s(one, tanh_lsx(inner)));
+}
+
 static NCNN_FORCEINLINE __m128 swish_lsx(__m128 inputs)
 {
     return __lsx_vfmul_s(inputs, sigmoid_lsx(inputs));
@@ -104,6 +115,11 @@ static NCNN_FORCEINLINE __m128 activation_lsx(__m128 _v, int activation_type, co
         __m128 _b = (__m128)__lsx_vreplfr2vr_s(activation_params[1]);
         return hardswish_lsx(_v, _a, _b);
     }
+    case 7:
+    {
+        // fast GELU (tanh approximation)
+        return fast_gelu_lsx(_v);
+    }
     }
 
     return _v;
@@ -132,6 +148,17 @@ static NCNN_FORCEINLINE __m256 tanh_lasx(__m256 inputs)
 static NCNN_FORCEINLINE __m256 mish_lasx(__m256 inputs)
 {
     return __lasx_xvfmul_s(inputs, tanh_lasx(log256_ps(__lasx_xvfadd_s(exp256_ps(inputs), (__m256)__lasx_xvreplfr2vr_s(1.f)))));
+}
+
+static NCNN_FORCEINLINE __m256 fast_gelu_lasx(__m256 inputs)
+{
+    // 0.5x * (1 + tanh(0.79788452 * (x + 0.044715 * x^3)))
+    const __m256 half = (__m256)__lasx_xvreplfr2vr_s(0.5f);
+    const __m256 one = (__m256)__lasx_xvreplfr2vr_s(1.0f);
+    __m256 x3 = __lasx_xvfmul_s(__lasx_xvfmul_s(inputs, inputs), inputs);
+    __m256 inner = __lasx_xvfadd_s(__lasx_xvfmul_s((__m256)__lasx_xvreplfr2vr_s(0.79788452f), inputs),
+                                   __lasx_xvfmul_s((__m256)__lasx_xvreplfr2vr_s(0.044715f * 0.79788452f), x3));
+    return __lasx_xvfmul_s(__lasx_xvfmul_s(half, inputs), __lasx_xvfadd_s(one, tanh_lasx(inner)));
 }
 
 static NCNN_FORCEINLINE __m256 swish_lasx(__m256 inputs)
@@ -207,6 +234,11 @@ static NCNN_FORCEINLINE __m256 activation_lasx(__m256 _v, int activation_type, c
         __m256 _a = (__m256)__lasx_xvreplfr2vr_s(activation_params[0]);
         __m256 _b = (__m256)__lasx_xvreplfr2vr_s(activation_params[1]);
         return hardswish_lasx(_v, _a, _b);
+    }
+    case 7:
+    {
+        // fast GELU (tanh approximation)
+        return fast_gelu_lasx(_v);
     }
     }
 

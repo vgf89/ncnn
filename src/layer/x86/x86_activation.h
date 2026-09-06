@@ -44,6 +44,16 @@ static NCNN_FORCEINLINE __m128 hardswish_sse(__m128 inputs, __m128 a, __m128 b)
     return _mm_mul_ps(b, inputs);
 }
 
+static NCNN_FORCEINLINE __m128 fast_gelu_sse(__m128 inputs)
+{
+    // 0.5x * (1 + tanh(0.79788452 * (x + 0.044715 * x^3)))
+    const __m128 half = _mm_set1_ps(0.5f);
+    const __m128 one = _mm_set1_ps(1.0f);
+    __m128 x3 = _mm_mul_ps(_mm_mul_ps(inputs, inputs), inputs);
+    __m128 inner = _mm_comp_fmadd_ps(_mm_set1_ps(0.044715f * 0.79788452f), x3, _mm_mul_ps(_mm_set1_ps(0.79788452f), inputs));
+    return _mm_mul_ps(_mm_mul_ps(half, inputs), _mm_add_ps(one, tanh_sse(inner)));
+}
+
 static NCNN_FORCEINLINE __m128 lrelu_sse(__m128 inputs, float slope)
 {
     __m128 pos = _mm_max_ps(_mm_setzero_ps(), inputs);
@@ -103,6 +113,10 @@ static NCNN_FORCEINLINE __m128 activation_sse(__m128 _v, int activation_type, co
         __m128 _b = _mm_set1_ps(activation_params[1]);
         return hardswish_sse(_v, _a, _b);
     }
+    case 7:
+    {
+        return fast_gelu_sse(_v);
+    }
     }
 
     return _v;
@@ -132,6 +146,20 @@ static NCNN_FORCEINLINE __m256 tanh_avx(__m256 inputs)
 static NCNN_FORCEINLINE __m256 mish_avx(__m256 inputs)
 {
     return _mm256_mul_ps(inputs, tanh_avx(log256_ps(_mm256_add_ps(exp256_ps(inputs), _mm256_set1_ps(1.f)))));
+}
+
+static NCNN_FORCEINLINE __m256 fast_gelu_avx(__m256 inputs)
+{
+    // 0.5x * (1 + tanh(0.79788452 * (x + 0.044715 * x^3)))
+    const __m256 half = _mm256_set1_ps(0.5f);
+    const __m256 one = _mm256_set1_ps(1.0f);
+    __m256 x3 = _mm256_mul_ps(_mm256_mul_ps(inputs, inputs), inputs);
+#if __FMA__ || __FMA4__
+    __m256 inner = _mm256_comp_fmadd_ps(_mm256_set1_ps(0.044715f * 0.79788452f), x3, _mm256_mul_ps(_mm256_set1_ps(0.79788452f), inputs));
+#else
+    __m256 inner = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(0.044715f * 0.79788452f), x3), _mm256_mul_ps(_mm256_set1_ps(0.79788452f), inputs));
+#endif
+    return _mm256_mul_ps(_mm256_mul_ps(half, inputs), _mm256_add_ps(one, tanh_avx(inner)));
 }
 
 static NCNN_FORCEINLINE __m256 swish_avx(__m256 inputs)
@@ -207,6 +235,10 @@ static NCNN_FORCEINLINE __m256 activation_avx(__m256 _v, int activation_type, co
         __m256 _b = _mm256_set1_ps(activation_params[1]);
         return hardswish_avx(_v, _a, _b);
     }
+    case 7:
+    {
+        return fast_gelu_avx(_v);
+    }
     }
 
     return _v;
@@ -231,6 +263,16 @@ static NCNN_FORCEINLINE __m512 tanh_avx512(__m512 inputs)
 static NCNN_FORCEINLINE __m512 mish_avx512(__m512 inputs)
 {
     return _mm512_mul_ps(inputs, tanh_avx512(log512_ps(_mm512_add_ps(exp512_ps(inputs), _mm512_set1_ps(1.f)))));
+}
+
+static NCNN_FORCEINLINE __m512 fast_gelu_avx512(__m512 inputs)
+{
+    // 0.5x * (1 + tanh(0.79788452 * (x + 0.044715 * x^3)))
+    const __m512 half = _mm512_set1_ps(0.5f);
+    const __m512 one = _mm512_set1_ps(1.0f);
+    __m512 x3 = _mm512_mul_ps(_mm512_mul_ps(inputs, inputs), inputs);
+    __m512 inner = _mm512_fmadd_ps(_mm512_set1_ps(0.044715f * 0.79788452f), x3, _mm512_mul_ps(_mm512_set1_ps(0.79788452f), inputs));
+    return _mm512_mul_ps(_mm512_mul_ps(half, inputs), _mm512_add_ps(one, tanh_avx512(inner)));
 }
 
 static NCNN_FORCEINLINE __m512 swish_avx512(__m512 inputs)
@@ -304,6 +346,10 @@ static NCNN_FORCEINLINE __m512 activation_avx512(__m512 _v, int activation_type,
         __m512 _a = _mm512_set1_ps(activation_params[0]);
         __m512 _b = _mm512_set1_ps(activation_params[1]);
         return hardswish_avx512(_v, _a, _b);
+    }
+    case 7:
+    {
+        return fast_gelu_avx512(_v);
     }
     }
 

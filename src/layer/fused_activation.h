@@ -58,6 +58,12 @@ static NCNN_FORCEINLINE float activation_ss(float v, int activation_type, const 
             v = v * (v * alpha + beta);
         break;
     }
+    case 7:
+    {
+        // fast GELU (tanh approximation, matches GELU layer fast_gelu=1)
+        v = 0.5f * v * (1.f + tanhf(0.79788452f * (v + 0.044715f * v * v * v)));
+        break;
+    }
     }
 
     return v;
@@ -113,6 +119,15 @@ static ncnn::Layer* create_activation_layer(int activation_type, const ncnn::Mat
         ncnn::ParamDict pd;
         pd.set(0, activation_params[0]); // alpha
         pd.set(1, activation_params[1]); // beta
+
+        activation->load_param(pd);
+    }
+    else if (activation_type == 7)
+    {
+        activation = ncnn::create_layer_cpu(ncnn::LayerType::GELU);
+
+        ncnn::ParamDict pd;
+        pd.set(0, 1); // fast_gelu (tanh approximation)
 
         activation->load_param(pd);
     }
